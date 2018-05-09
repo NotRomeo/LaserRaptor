@@ -8,7 +8,7 @@ public class LineFollower implements Behavior
 {
 	private static ColorSampleExample cse = new ColorSampleExample();
 	private int BasicSpeed = 300;
-	private int maximumSpeed = 550;
+	private int maxSpeed = 550;
 	private double PGain = 300;
 	private double DGain = 2000;
 	private float middleValue;
