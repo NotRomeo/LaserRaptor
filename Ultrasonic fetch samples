@@ -1,0 +1,27 @@
+import lejos.hardware.Button;
+import lejos.hardware.port.SensorPort;
+import lejos.robotics.SampleProvider;
+import lejos.hardware.sensor.EV3UltrasonicSensor;
+
+public class UltrasonicSensor {
+	EV3UltrasonicSensor sound;
+	SampleProvider soundSample;
+	float[] sample;
+	
+	public UltrasonicSensor()
+	{
+		sound = new EV3UltrasonicSensor(SensorPort.S3);
+		soundSample = sound.getDistanceMode();
+		// Initialize the array with the size of 1 sample.
+		// A float is used since the value can be decimal
+		//sample = getSoundSample();
+				
+	}
+	public float[] getSoundSample()
+	{
+		Button.waitForAnyPress();
+		sample = new float[sound.sampleSize()];
+		sound.fetchSample(sample, 0);
+		return sample;
+	}
+}
