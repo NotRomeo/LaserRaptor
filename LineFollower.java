@@ -62,15 +62,10 @@ public class LineFollower implements Behavior
 			int leftSpeed = BasicSpeed - speed;
 			
 			//Now we need the speeds to have a value between their max and min values
-			if (leftSpeed < 0)
-				leftSpeed = 0;
-			else if(leftSpeed > maximumSpeed)
-				leftSpeed = maximumSpeed;
-			
-			if (rightSpeed < 0)
-				rightSpeed = 0;
-			else if(rightSpeed > maximumSpeed)
-				rightSpeed = maximumSpeed;
+			leftSpeed = Math.max(leftSpeed, 0);
+			leftSpeed = Math.min(leftSpeed, maxSpeed);
+			rightSpeed = Math.max(rightSpeed, 0);
+			rightSpeed = Math.min(rightSpeed, maxSpeed);
 			
 			Motor.D.setSpeed(rightSpeed);
 			Motor.A.setSpeed(leftSpeed);
