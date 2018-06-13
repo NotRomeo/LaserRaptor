@@ -1,0 +1,89 @@
+package testpac;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+public class ObjectDetective {
+
+	Gyrosensors rotate;
+	UltrasonicSensor sound;
+	Map<Float,Float> dataPoints = new HashMap<>();
+	
+	// Create constructor
+		public ObjectDetective() 
+		{
+			Button.waitForAnyPress();
+			sound = new UltrasonicSensor();
+			rotate = new Gyrosensors();
+			calibrate();
+			//float min = Collections.min(dataPoints.values());
+			Entry<Float, Float> min = null;
+			for (Entry<Float, Float> entry : dataPoints.entrySet()) {
+			    if (min == null || min.getValue() > entry.getValue()) {
+			        min = entry;
+			    }
+			}
+			float key = min.getKey();
+			float[] rotation = rotate.getRotation();
+			float angle = rotation[0];
+			while(angle!=key)
+			{
+				Motor.D.forward();
+				for (float x: rotation)
+				{
+					rotation = rotate.getRotation();
+					angle = x;
+				}
+			}
+			driving();
+			grasping();
+		}
+		private void driving()
+		{
+			float [] dist = sound.getSoundSample();
+			while (dist[0] > 0.20f)
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+				dist = sound.getSoundSample();
+			}
+		}
+		private void grasping()
+		{
+			Motor.C.setSpeed(1200f);
+			for (int i=0; i<28500; i++)
+				Motor.C.forward();
+			
+			 for (int j=0; j<10000; j++)
+			 {
+				Motor.D.backward();
+				Motor.A.backward();
+			 }
+			 for (int k=0; k<84000; k++)
+			 {
+				 Motor.C.backward();
+			 }
+		}
+		private void calibrate()
+		{
+			rotate.resetGyro();
+			float[] rotation = rotate.getRotation();
+			float angle = 0f;
+			while(angle<360f)
+			{
+				Motor.D.backward();
+				for (float x: rotation)
+				{
+					float[] distance = sound.getSoundSample();
+					dataPoints.put(angle, distance[0]);
+					rotation = rotate.getRotation();
+					angle = x;
+				}
+			}
+			Motor.D.stop(true);
+		}	
+}
