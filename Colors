@@ -1,0 +1,31 @@
+package ExpeditionRobinson;
+
+import lejos.hardware.Button;
+
+public class DetectRedBlue 
+{
+	private static ColorSampleExample cse;
+	
+	public DetectRedBlue(ColorSampleExample cse)
+	{
+		this.cse = cse;
+	}
+	
+	public String redOrBlue()
+	{
+		float[] rgb = cse.rgbSample();
+		if(rgb[0] > rgb[2])
+		{
+			System.out.println("We are on red");
+			return "RED";
+		}
+		else if(rgb[2] >rgb[0])
+		{
+			System.out.println("We are on blue");
+			return "BLUE";
+		}
+		else
+			return null;
+	}
+	
+}
