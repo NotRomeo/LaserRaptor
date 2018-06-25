@@ -1,0 +1,151 @@
+import lejos.robotics.subsumption.Behavior;
+import lejos.utility.Delay;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+
+public class ToFirstSeenPillar implements Behavior
+{
+	private UltraSample uSample;
+	private GyroSensor gSensor;
+	
+	double distanceToPillar = 0.0;
+	
+	private int BasicSpeed = 300;
+	private int MaximumSpeed = 550;
+	
+	public ToFirstSeenPillar(UltraSample uSample, GyroSensor gSensor)
+	{
+		this.uSample = uSample;
+		this.gSensor = gSensor;
+	}
+	
+	private boolean suppressed = false;
+	
+	public boolean takeControl()
+	{
+		return true;
+	}
+	
+	public void suppress()
+	{
+		suppressed = true;
+	}
+	
+	public void action()
+	{
+		suppressed = false;
+		Motor.A.forward();
+		Motor.D.forward();
+		while (!suppressed)
+		{
+			Thread.yield();
+		}
+		Motor.A.stop();
+		Motor.D.stop();
+	}
+	
+	//
+	public void scanForPosition()
+	{
+		double topLimit = 1.5;
+		distanceToPillar = 0.0;
+		//System.out.println("Scanning");
+		Motor.A.setSpeed(BasicSpeed - 100);
+		gSensor.reset();
+		
+		
+		boolean found = false;
+		boolean turnedAround = false;
+		
+		while(!found && !turnedAround)
+		{
+			float thisAngle = 0;
+			float[] angle = gSensor.angle();
+			for(float x: angle)
+			{
+				thisAngle = x;
+			}
+			if(thisAngle <= -360)
+			{
+				turnedAround = true;
+//				System.out.println(distanceToPillar);
+				Motor.A.stop(true);
+				if(distanceToPillar == 0.0)
+					wander();
+			}
+			else
+			{
+				float[] distance = uSample.getSoundSample();
+				for(float x: distance)
+				{
+					if(x < (float)topLimit && x > 0.0)
+					{
+						distanceToPillar = x;
+						found = true;
+					}
+				}
+				if(!found)
+					Motor.A.forward();
+			}
+		}
+		Motor.A.stop(true);
+		approach();
+	}
+	
+	public void wander()
+	{
+		//System.out.println("Wandering now");
+		Motor.D.setSpeed(BasicSpeed);
+		Motor.A.setSpeed(MaximumSpeed);
+		for(int i = 30000; i > 0; i--)
+		{
+			Motor.A.forward();
+			Motor.D.forward();
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+		gSensor.reset();
+		scanForPosition();
+	}
+	
+	public void approach()
+	{
+		//System.out.println("Approaching");
+		Motor.A.setSpeed(BasicSpeed);
+		Motor.D.setSpeed(BasicSpeed);
+		
+		while(distanceToPillar > 0.08)
+		{
+			if(distanceToPillar > 1.5)
+			{
+				Motor.A.stop(true);
+				Motor.D.stop(true);
+				scanForPosition();
+				break;
+			}
+			else
+			{
+				Motor.A.forward();
+				Motor.D.forward();
+				float[] measure = uSample.getSoundSample();
+				for(float x : measure)
+				{
+					distanceToPillar = (double)x;
+				}	
+			}
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public void toPillar()
+	{
+		scanForPosition();
+		System.out.println("Found one");
+		Delay.msDelay(3000);
+	}
+}
