@@ -15,111 +15,110 @@ public class ObjectDetective {
 	Map<Float,Float> dataPoints = new HashMap<>();
 	
 	// Create constructor
-		public ObjectDetective() 
-		{
-			Button.waitForAnyPress();
-			sound = new UltrasonicSensor();
-			rotate = new Gyrosensors();
-			colours = new DetectRedBlue();
-		}
-		public void findPillars()
-		{
+	public ObjectDetective() 
+	{
+		Button.waitForAnyPress();
+		sound = new UltrasonicSensor();
+		rotate = new Gyrosensors();
+		colours = new DetectRedBlue();
+	}
+	public void findPillars()
+	{
 			
-			for(int i=0; i<4; i++)
-			{
-				rotate.resetGyro();
-				mapAngleToDist(360f);
-				float angleToRotateTo = locatePillar();
-				rotateTo(angleToRotateTo, true);
-				approachPillar();
-				grasping();
-			}
-		}
-		private void relocatePillar()
+		for(int i=0; i<4; i++)
 		{
-			System.out.println("relocating");
-			dataPoints.clear();
 			rotate.resetGyro();
-			rotateTo(-10f, true);
-			mapAngleToDist(10f);
-			float key = locatePillar();
-			rotateTo(key,true);	
+			mapAngleToDist(360f);
+			float angleToRotateTo = locatePillar();
+			rotateTo(angleToRotateTo, true);
+			approachPillar();
+			grasping();
 		}
-		private float locatePillar()
-		{
-			Entry<Float, Float> min = null;
-			for (Entry<Float, Float> entry : dataPoints.entrySet()) {
-			    if (min == null || min.getValue() > entry.getValue()) {
-			        min = entry;
-			    }
-			}
-			return min.getKey();
+	}
+	private void relocatePillar()
+	{
+		System.out.println("relocating");
+		dataPoints.clear();
+		rotate.resetGyro();
+		rotateTo(-10f, true);
+		mapAngleToDist(10f);
+		float key = locatePillar();
+		rotateTo(key,true);	
+	}
+	private float locatePillar()
+	{
+		Entry<Float, Float> min = null;
+		for (Entry<Float, Float> entry : dataPoints.entrySet()) {
+		    if (min == null || min.getValue() > entry.getValue()) {
+		        min = entry;
+		    }
 		}
-		private void approachPillar()
+		return min.getKey();
+	}
+	private void approachPillar()
+	{
+		float [] dist = sound.getSoundSample();
+		float lastDist = 2.5f;
+		while (dist[0] > 0.08f)
 		{
-			float [] dist = sound.getSoundSample();
-			float lastDist = 2.5f;
-			while (dist[0] > 0.08f)
-			{
-				if(dist[0] > lastDist)
-					relocatePillar();
-				Motor.A.backward();
+			if(dist[0] > lastDist)
+				relocatePillar();
+			Motor.A.backward();
+			Motor.D.backward();
+			lastDist = dist[0];
+			dist = sound.getSoundSample();
+		}
+		System.out.println(colours.redOrBlue());
+	}
+	private void grasping()
+	{
+		Motor.C.setSpeed(1200f);
+		for (int i=0; i<28500; i++)
+			Motor.C.forward();	
+		for (int j=0; j<10000; j++)
+		{
+			Motor.D.backward();
+			Motor.A.backward();
+		}
+		for (int k=0; k<84000; k++)
+		{
+			 Motor.C.backward();
+		}
+	}
+	private void rotateTo(float angleToRotateTo, boolean forward)
+	{
+		float[] rotation = rotate.getRotation();
+		float angle = rotation[0];
+		while(angle!=angleToRotateTo)
+		{
+			if(forward)
+				Motor.D.forward();
+			else
 				Motor.D.backward();
-				lastDist = dist[0];
-				dist = sound.getSoundSample();
-			}
-			System.out.println(colours.redOrBlue());
-		}
-		private void grasping()
-		{
-			Motor.C.setSpeed(1200f);
-			for (int i=0; i<28500; i++)
-				Motor.C.forward();
-			
-			 for (int j=0; j<10000; j++)
-			 {
-				Motor.D.backward();
-				Motor.A.backward();
-			 }
-			 for (int k=0; k<84000; k++)
-			 {
-				 Motor.C.backward();
-			 }
-		}
-		private void rotateTo(float angleToRotateTo, boolean forward)
-		{
-			float[] rotation = rotate.getRotation();
-			float angle = rotation[0];
-			while(angle!=angleToRotateTo)
+			for (float x: rotation)
 			{
-				if(forward)
-					Motor.D.forward();
-				else
-					Motor.D.backward();
-				for (float x: rotation)
-				{
-					rotation = rotate.getRotation();
-					angle = x;
-				}
+				rotation = rotate.getRotation();
+				angle = x;
 			}
-			Motor.D.stop(true);
-		}	
+		}
+		Motor.D.stop(true);
+	}	
 		
-		private void mapAngleToDist(float angleToRotate)
+	private void mapAngleToDist(float angleToRotate)
+	{
+		float[] rotation = rotate.getRotation();
+		float angle = rotation[0];
+		while(angle<angleToRotate)
 		{
-			float[] rotation = rotate.getRotation();
-			float angle = rotation[0];
-			while(angle<angleToRotate)
+			Motor.D.backward();
+			for (float x: rotation)
 			{
-				Motor.D.backward();
-				for (float x: rotation)
-				{
-					float[] distance = sound.getSoundSample();
-					dataPoints.put(angle, distance[0]);
-					rotation = rotate.getRotation();
-					angle = x;
-				}
+				float[] distance = sound.getSoundSample();
+				dataPoints.put(angle, distance[0]);
+				rotation = rotate.getRotation();
+				angle = x;
 			}
-			Motor.D.stop(true);
-		}	
+		}
+		Motor.D.stop(true);
+	}	
 }
