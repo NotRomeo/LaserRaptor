@@ -1,0 +1,145 @@
+package testpac;
+
+import lejos.hardware.Sound;
+import lejos.utility.Delay;
+
+public class Music {
+
+	private final static int[] PIANO = new int[] {4,25,500,7000,5};
+	private static int qNote = 450;
+	private static int qDelay = 15;
+	
+	private static int e = 330;
+	//private static int b2 = 124;
+	//private static int a2 = 110;
+	//private static int e3 = 165; 
+	private static int a = 440;
+	private static int c = 264;
+	private static int d = 297;
+	private static int b = 494;
+	private static int g = 396;
+	private static int fsharp = 370;
+	private static int gsharp = 415;
+	private static int dsharp = 622;
+	private static int csharp = 554;
+	
+	public static void goodBadUgly()
+	{
+		Sound.setVolume(50);
+		play(e,0.250);
+		play(a, 0.250);
+		play(e,0.250);
+		play(a, 0.250);
+		play(e, 2);
+		play(c, 1);
+		play(d, 1);
+		play(220, 2);
+		Sound.pause(1000);
+		
+		play(e, 0.250);
+		play(a, 0.250);
+		play(e, 0.250);
+		play(a, 0.250);
+		play(e, 2);
+		play(c, 1);
+		play(d, 1);
+		play(g, 2);
+		Sound.pause(1000);
+				
+		play(e, 0.250);
+		play(a, 0.250);
+		play(e, 0.250);
+		play(a, 0.250);
+		play(a, 2);
+		play(528, 1);
+		play(495, 0.500);
+		play(a, 0.500);
+		play(g, 2);
+		Sound.pause(1000);
+				
+		play(e, 0.250);
+		play(a, 0.250);
+		play(e, 0.250);
+		play(a, 0.250);
+		play(e, 1);
+		Sound.pause(500);
+				
+		play(d, 1);
+		play(220, 0.500);
+		play(220, 4);
+	}
+	
+	public static void TakeMeOn()
+	{
+		Sound.setVolume(50);
+		play(fsharp, 0.250);
+		play(fsharp, 0.250);
+		play(d, 0.250);
+		play(b, 0.500);
+		play(b, 0.500);
+		play(e, 0.500);
+		play(e, 0.500);
+		play(e, 0.500);
+		play(gsharp, 0.250);
+		play(gsharp, 0.500);
+		play(a, 0.500);
+		play(495, 0.500);
+		play(a, 0.250);
+		play(a, 0.250);
+		play(a, 0.250);
+		play(e, 0.375);
+		play(d, 0.375);
+		play(fsharp, 0.375);
+		play(fsharp, 0.375);
+		play(fsharp, 0.375);
+		play(e, 0.500);
+		play(e, 0.750);
+		play(fsharp, 0.750);
+		play(d, 1);
+	}
+	
+	public static void GhostBusters()
+	{
+		Sound.setVolume(50);
+		play(b, 0.500);
+		play(dsharp, 0.500);
+		play(b, 0.500);
+		play(dsharp, 0.500);
+		play(b, 0.500);
+		Sound.pause(500);
+		
+		play(b, 0.5);
+		play(b, 0.5);
+		play(a, 1);
+		play(b, 0.5);
+		Sound.pause(500);
+				
+		play(b, 0.5);
+		play(dsharp, 1);
+		play(b, 0.5);
+		play(csharp, 1);
+		play(a, 0.5);
+		play(b, 1);
+		Sound.pause(500);
+				
+		play(b, 0.5);
+		Sound.pause(125);
+		play(b, 1);
+		Sound.pause(125);
+		play(a, 0.5);
+		play(csharp, 0.25);
+		Sound.pause(125);
+		play(b, 0.5);
+		
+		// to add concurrently maybe
+		//play(b2, 3);
+		//play(a2, 1);
+		//play(e3, 1);
+	}
+
+	private static void play(int frequency, double length)
+	{
+		Sound.playNote(PIANO, frequency, (int) (length * qNote) - (int)(length * qDelay));
+		Delay.msDelay((long) (length * qDelay));
+	}
+}
