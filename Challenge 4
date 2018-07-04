@@ -1,0 +1,384 @@
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+import lejos.robotics.subsumption.Behavior;
+import lejos.robotics.subsumption.Arbitrator;
+import lejos.utility.Delay;
+
+public class RobotMain {
+
+	public static void main(String[] args) {
+  
+    ColorSampleExample cse = new ColorSampleExample();
+		Behavior laserRaptorFol = new LineFollowing(cse);
+		PoleScanning laserRaptorPole = new PoleScanning(cse);
+		Behavior laserRaptorGrab = new Grabbing(laserRaptorPole);
+		Behavior wandering = new Wandering();
+		Behavior [] behaviorArray = {wandering, laserRaptorFol, laserRaptorPole, laserRaptorGrab};
+		Arbitrator arbitrator = new Arbitrator(behaviorArray);
+	  arbitrator.go();
+    }
+    
+public class Wandering implements Behavior{
+
+	private boolean suppressed = false;
+	
+	@Override
+	public boolean takeControl() {
+		return true;
+	}
+
+	@Override
+	public void action() {
+		suppressed = false;
+		Motor.D.backward();
+		Motor.A.backward();
+		while(!suppressed)
+			Thread.yield();
+		Motor.D.stop(true);
+		Motor.A.stop(true);
+	}
+
+	@Override
+	public void suppress() {
+		suppressed = true;
+		
+	}
+
+}
+
+public class LineFollowing implements Behavior {
+
+	ColorSampleExample cse;
+	private float thrivePoint;
+	private int maxSpeed = 550;
+	private int baseSpeed = 300;
+	private double PGain = 300;
+	private double DGain = 2000;
+	private boolean suppressed = false;
+
+	// Create constructor
+	public LineFollowing(ColorSampleExample cse) {
+			this.cse = cse;
+			calibrate();
+		}
+
+	private void calibrate() {
+		Button.waitForAnyPress();
+		float sum = 0;
+		float setup = 0;
+		for(int i=0; i<100; i++)
+		{
+			setup = 0;
+			float [] point = cse.redSample();
+			for(float number: point)
+				setup = number;
+			sum += setup;
+		}
+		thrivePoint = sum/100;
+	}
+
+
+	@Override
+	public boolean takeControl() {
+		double sample = 0.0;
+		float [] result = cse.redSample();
+		for (float number : result)
+			sample = number;
+		return (thrivePoint - 0.1) < sample && (thrivePoint + 0.1) > sample;
+	}
+
+
+	@Override
+	public void action() {
+		double lastError = 0;
+		while(!suppressed) {
+			suppressed = false;
+			int power = 0;
+			double sample = 0.0;
+			float [] result = cse.redSample();
+			for (float number : result)
+				sample = number;
+			double error = thrivePoint - sample;
+			power = (int) (7*(PGain * error + DGain * (error - lastError)));
+			lastError = error;
+			
+			int leftSpeed = baseSpeed - power;
+			int rightSpeed = baseSpeed + power;
+			leftSpeed = Math.max(leftSpeed, 0);
+			leftSpeed = Math.min(leftSpeed, maxSpeed);
+			rightSpeed = Math.max(rightSpeed, 0);
+			rightSpeed = Math.min(rightSpeed, maxSpeed);
+			Motor.A.setSpeed(leftSpeed);
+			Motor.D.setSpeed(rightSpeed);
+			Motor.A.backward();
+			Motor.D.backward();
+			Thread.yield();
+		}
+		// continue at least for 1.5 seconds in case the line was lost, otherwise go to the wander
+		for(int i = 0; i<1500; i++)
+		{
+			int power = 0;
+			double sample = 0.0;
+			float [] result = cse.redSample();
+			for (float number : result)
+				sample = number;
+			double error = thrivePoint - sample;
+			power = (int) (7*(PGain * error + DGain * (error - lastError)));
+			lastError = error;
+			
+			int leftSpeed = baseSpeed - power;
+			int rightSpeed = baseSpeed + power;
+			leftSpeed = Math.max(leftSpeed, 0);
+			leftSpeed = Math.min(leftSpeed, maxSpeed);
+			rightSpeed = Math.max(rightSpeed, 0);
+			rightSpeed = Math.min(rightSpeed, maxSpeed);
+			Motor.A.setSpeed(leftSpeed);
+			Motor.D.setSpeed(rightSpeed);
+			Motor.A.backward();
+			Motor.D.backward();
+		}
+		// cleanup
+		Motor.D.stop(true);
+		Motor.A.stop(true);
+	}
+
+	@Override
+	public void suppress() {
+		suppressed = true;
+	}
+}
+public class PoleScanning implements Behavior{
+	
+	UltrasonicSensor sound;
+	Gyrosensors rotate;
+	DetectRedBlue colours;
+	private boolean poleFound = false;
+	private boolean suppressed = false;
+	private int BasicSpeed = 300;
+	private int MaximumSpeed = 550;
+	private double distanceToPillar = 0.0;
+	
+	public PoleScanning(ColorSampleExample cse)
+	{
+		Button.waitForAnyPress();
+		sound = new UltrasonicSensor();
+		rotate = new Gyrosensors();
+		colours = new DetectRedBlue(cse);
+	}
+	
+	@Override
+	public boolean takeControl() {
+		float [] dist = sound.getSoundSample();
+		return dist[0] < 0.5 && !poleFound;
+	}
+
+	@Override
+	public void suppress() {
+		suppressed = true;
+		
+	}
+	@Override
+	public void action()
+	{
+		suppressed = false;
+		approach();
+		System.out.println("PillarSearch");
+		while (!suppressed)
+		{
+			Thread.yield();
+		}
+		//cleanup
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public UltrasonicSensor ultra()
+	{
+		return sound;
+	}
+	public boolean poleFound()
+	{
+		return poleFound;
+	}
+	public void setPoleFound(boolean found)
+	{
+		poleFound = found;
+	}
+	//
+	public void scanForPosition()
+	{
+		double topLimit = 1.5;
+		distanceToPillar = 0.0;
+		System.out.println("Scanning");
+		Motor.A.setSpeed(BasicSpeed - 100);
+		rotate.resetGyro();
+		
+		boolean found = false;
+		boolean turnedAround = false;
+		
+		while(!found && !turnedAround)
+		{
+			float thisAngle = 0;
+			float[] angle = rotate.getRotation();
+			for(float x: angle)
+			{
+				thisAngle = x;
+			}
+			if(thisAngle <= -360)
+			{
+				turnedAround = true;
+//				System.out.println(distanceToPillar);
+				Motor.A.stop(true);
+				if(distanceToPillar == 0.0)
+					wander();
+			}
+			else
+			{
+				float[] distance = sound.getSoundSample();
+				for(float x: distance)
+				{
+					if(x < (float)topLimit && x > 0.0)
+					{
+						distanceToPillar = x;
+						found = true;
+					}
+				}
+				if(!found)
+					Motor.A.backward();
+			}
+		}
+		Motor.A.stop(true);
+		approach();
+	}
+	
+	public void wander()
+	{
+		//System.out.println("Wandering now");
+		Motor.D.setSpeed(BasicSpeed);
+		Motor.A.setSpeed(MaximumSpeed);
+		for(int i = 30000; i > 0; i--)
+		{
+			Motor.A.backward();
+			Motor.D.backward();
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+		rotate.resetGyro();
+		scanForPosition();
+	}
+	
+	public void approach()
+	{
+		System.out.println("Approaching");
+		Motor.A.setSpeed(BasicSpeed);
+		Motor.D.setSpeed(BasicSpeed);
+		
+		while(distanceToPillar > 0.08)
+		{
+			if(distanceToPillar > 1.5)
+			{
+				Motor.A.stop(true);
+				Motor.D.stop(true);
+				scanForPosition();
+				break;
+			}
+			else
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+				float[] measure = sound.getSoundSample();
+				for(float x : measure)
+				{
+					distanceToPillar = (double)x;
+				}	
+			}
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public void toPillar()
+	{
+		String colour = colours.redOrBlue();
+		if(colour.equals("RED"))
+		{
+			// drive left
+			 for(int i=0; i< 500; i++)
+			 {	
+				 Motor.D.setSpeed(300);
+				 Motor.A.setSpeed(100);
+				 Motor.D.backward();
+				 Motor.A.backward();
+			 } 
+		}
+		//drive right
+		else if(colour.equals("BLUE"))
+		{
+			for(int i=0; i< 500; i++)
+			 {	
+				 Motor.D.setSpeed(100);
+				 Motor.A.setSpeed(300);
+				 Motor.D.backward();
+				 Motor.A.backward();
+			 } 
+		}
+		poleFound = true;
+		System.out.println("Found one");
+		Delay.msDelay(3000);
+	}
+}
+public class Grabbing implements Behavior{
+	
+	UltrasonicSensor sound;
+	PoleScanning scan;
+	boolean grabbing = true;
+	boolean suppressed = false;
+	
+	public Grabbing(Behavior laserRaptorPole)
+	{
+		this.scan = (PoleScanning) laserRaptorPole;
+		sound = scan.ultra();
+	}
+	
+	private void grab()
+	{
+		Motor.C.setSpeed(1200f);
+		for (int i=0; i<28500; i++)
+			Motor.C.forward();
+		scan.setPoleFound(false);
+		
+	}
+	private void release()
+	{
+		Motor.C.setSpeed(1200f);
+		for (int k=0; k<84000; k++)
+			 Motor.C.backward();
+	}
+	@Override
+	public boolean takeControl() {
+		float [] dist = sound.getSoundSample();
+		return scan.poleFound() && dist[0] < 0.08;
+	}
+	@Override
+	public void action() {
+		suppressed = false;
+		if(grabbing)
+		{
+			grab();
+			grabbing = false;
+		}
+		else
+		{
+			release();
+			grabbing = true;
+		}
+		while(!suppressed && Motor.C.isMoving())
+			Thread.yield();
+		Motor.C.stop(true);
+	}
+	@Override
+	public void suppress() {
+		suppressed = true;
+	}
+}
+
