@@ -8,11 +8,7 @@ public class Music {
 	private final static int[] PIANO = new int[] {4,25,500,7000,5};
 	private static int qNote = 450;
 	private static int qDelay = 15;
-	
 	private static int e = 330;
-	//private static int b2 = 124;
-	//private static int a2 = 110;
-	//private static int e3 = 165; 
 	private static int a = 440;
 	private static int c = 264;
 	private static int d = 297;
@@ -131,13 +127,10 @@ public class Music {
 		Sound.pause(125);
 		play(b, 0.5);
 		
-		// to add concurrently maybe
-		//play(b2, 3);
-		//play(a2, 1);
-		//play(e3, 1);
 	}
-
-	private static void play(int frequency, double length)
+	//this function was suggested to make the sounds seem more natural and make the pauses more 
+	//distinguishable by another group
+	private static void play(int frequency, double length)  
 	{
 		Sound.playNote(PIANO, frequency, (int) (length * qNote) - (int)(length * qDelay));
 		Delay.msDelay((long) (length * qDelay));
