@@ -1,0 +1,147 @@
+import lejos.robotics.subsumption.Behavior;
+import lejos.utility.Delay;
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+
+public class PoleScanning implements Behavior{
+	
+	UltrasonicSensor sound;
+	Gyrosensors rotate;
+	DetectRedBlue colours;
+	private boolean right;
+	private boolean poleFound = false;
+	private boolean suppressed = false;
+	private int BasicSpeed = 300;
+	private int MaximumSpeed = 550;
+	private double distanceToPillar = 0.0;
+	
+	public PoleScanning(ColorSampleExample cse)
+	{
+		Button.waitForAnyPress();
+		sound = new UltrasonicSensor();
+		rotate = new Gyrosensors();
+		colours = new DetectRedBlue(cse);
+	}	
+	//
+	public void scanForPosition()
+	{
+		double topLimit = 1.5;
+		distanceToPillar = 0.0;
+		System.out.println("Scanning");
+		Motor.A.setSpeed(BasicSpeed - 100);
+		rotate.resetGyro();
+		
+		boolean found = false;
+		boolean turnedAround = false;
+		
+		while(!found && !turnedAround)
+		{
+			float thisAngle = 0;
+			float[] angle = rotate.getRotation();
+			for(float x: angle)
+			{
+				thisAngle = x;
+			}
+			if(thisAngle <= -360)
+			{
+				turnedAround = true;
+//				System.out.println(distanceToPillar);
+				Motor.A.stop(true);
+				if(distanceToPillar == 0.0)
+					wander();
+			}
+			else
+			{
+				float[] distance = sound.getSoundSample();
+				for(float x: distance)
+				{
+					if(x < (float)topLimit && x > 0.0)
+					{
+						distanceToPillar = x;
+						found = true;
+					}
+				}
+				if(!found)
+					Motor.A.backward();
+			}
+		}
+		Motor.A.stop(true);
+		approach();
+	}
+	
+	public void wander()
+	{
+		//System.out.println("Wandering now");
+		Motor.D.setSpeed(BasicSpeed);
+		Motor.A.setSpeed(MaximumSpeed);
+		for(int i = 30000; i > 0; i--)
+		{
+			Motor.A.backward();
+			Motor.D.backward();
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+		rotate.resetGyro();
+		scanForPosition();
+	}
+	
+	public void approach()
+	{
+		System.out.println("Approaching");
+		Motor.A.setSpeed(BasicSpeed);
+		Motor.D.setSpeed(BasicSpeed);
+		
+		while(distanceToPillar > 0.08)
+		{
+			if(distanceToPillar > 1.5)
+			{
+				Motor.A.stop(true);
+				Motor.D.stop(true);
+				scanForPosition();
+				break;
+			}
+			else
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+				float[] measure = sound.getSoundSample();
+				for(float x : measure)
+				{
+					distanceToPillar = (double)x;
+				}	
+			}
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public void toPillar()
+	{
+		scanForPosition();
+		String colour = colours.redOrBlue();
+		if(colour.equals("RED"))
+		{
+			 Music.goodBadUgly();
+			 for(int i=0; i< 500; i++)
+			 {	
+				 Motor.D.backward();
+				 Motor.A.backward();
+			 } 
+		}
+		else if(colour.equals("BLUE"))
+		{
+			Music.TakeMeOn();
+			for(int i=0; i< 14000; i++)
+			{
+				Motor.C.forward();
+			}
+			for(int i=0; i< 24000; i++)
+			{
+				Motor.C.backward();
+			}
+			
+		}	
+		System.out.println("Found one");
+		Delay.msDelay(3000);
+	}
+}
