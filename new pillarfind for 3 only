@@ -1,0 +1,265 @@
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+import lejos.utility.Delay;
+
+public class ToPillarFor3 
+{
+	private UltraSample uSample;
+	private GyroSensor gSensor;
+	private ColorSampleExample cse;
+	private DetectRedBlue colours;
+	
+	double distanceToPillar = 0.0;
+	
+	private int BasicSpeed = 300;
+	private int MaximumSpeed = 550;
+	
+	private float middleValue;
+	
+	public ToPillarFor3(UltraSample uSample, GyroSensor gSensor, ColorSampleExample cse)
+	{
+		this.uSample = uSample;
+		this.gSensor = gSensor;
+		this.cse = cse;
+		colours = new DetectRedBlue(cse);
+	}
+	
+	private boolean suppressed = false;
+	
+	public boolean takeControl()
+	{
+		return true;
+	}
+	
+	public void suppress()
+	{
+		suppressed = true;
+	}
+	
+	public void action()
+	{
+		suppressed = false;
+		Motor.A.forward();
+		Motor.D.forward();
+		while (!suppressed)
+		{
+			Thread.yield();
+		}
+		Motor.A.stop();
+		Motor.D.stop();
+	}
+	
+	//
+	public void scanForPosition()
+	{
+		double topLimit = 1.5;
+		distanceToPillar = 0.0;
+		System.out.println("Scanning");
+		Motor.A.setSpeed(BasicSpeed - 100);
+		gSensor.reset();
+		
+		boolean found = false;
+		boolean turnedAround = false;
+		
+		while(!found && !turnedAround)
+		{
+			float thisAngle = 0;
+			float[] angle = gSensor.angle();
+			for(float x: angle)
+			{
+				thisAngle = x;
+			}
+			if(thisAngle <= -360)
+			{
+				turnedAround = true;
+//				System.out.println(distanceToPillar);
+				Motor.A.stop(true);
+				if(distanceToPillar == 0.0)
+					wander();
+			}
+			else if(lineCheck())
+			{
+				scanForPosition();
+				break;
+			}
+			else
+			{
+				float[] distance = uSample.getSoundSample();
+				for(float x: distance)
+				{
+					if(x < (float)topLimit && x > 0.0)
+					{
+						distanceToPillar = x;
+						found = true;
+					}
+				}
+				if(!found)
+					Motor.A.backward();
+			}
+		}
+		Motor.A.stop(true);
+		approach();
+	}
+	
+	public void wander()
+	{
+		//System.out.println("Wandering now");
+		Motor.D.setSpeed(BasicSpeed);
+		Motor.A.setSpeed(MaximumSpeed);
+		for(int i = 30000; i > 0; i--)
+		{
+			if(lineCheck())
+			{
+				scanForPosition();
+				break;
+			}
+			else 
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+			}
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+		scanForPosition();
+	}
+	
+	public void approach()
+	{
+		//System.out.println("Approaching");
+		Motor.A.setSpeed(BasicSpeed);
+		Motor.D.setSpeed(BasicSpeed);
+		
+		while(distanceToPillar > 0.08)
+		{
+			if(distanceToPillar > 1.5)
+			{
+				Motor.A.stop(true);
+				Motor.D.stop(true);
+				scanForPosition();
+				break;
+			}
+			else if(lineCheck())
+			{
+				//lineCheck();
+				scanForPosition();
+				break;
+			}
+			else
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+				float[] measure = uSample.getSoundSample();
+				for(float x : measure)
+				{
+					distanceToPillar = (double)x;
+				}	
+			}
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public void toPillar()
+	{
+		scanForPosition();
+		String colour = colours.redOrBlue();
+		if(colour.equals("RED"))
+		{
+			 Music.goodBadUgly();
+			 for(int i=0; i< 500; i++)
+			 {	
+				 Motor.D.backward();
+				 Motor.A.backward();
+			 } 
+		}
+		else if(colour.equals("BLUE"))
+		{
+			Music.TakeMeOn();
+			for(int i=0; i< 14000; i++)
+			{
+				Motor.C.forward();
+			}
+			for(int i=0; i< 24000; i++)
+			{
+				Motor.C.backward();
+			}
+			
+		}	
+//		System.out.println("Found one");
+		Delay.msDelay(3000);
+	}
+	
+	public void autoCalibrate()
+	{
+		float sum = (float) 0.0;
+		for(int times = 0; times < 100; times++)
+		{
+			float[] midValue = cse.redSample();
+			double measured = 0.0;
+			for(float midVal : midValue)
+				measured = midVal;
+			sum += measured;
+		}
+		float whiteValue = sum/100;
+		Button.waitForAnyPress();
+		float sum2 = (float) 0.0;
+		for(int times = 0; times < 100; times++)
+		{
+			float[] midValue = cse.redSample();
+			double measured = 0.0;
+			for(float midVal : midValue)
+				measured = midVal;
+			sum2 += measured;
+		}
+		float blackValue = sum2/100;
+		this.middleValue = ((whiteValue + blackValue)/2);
+		Button.waitForAnyPress();
+	}
+	
+	public boolean lineCheck()
+	{
+		float[] midValue = cse.redSample();
+		double measured = 0.0;
+		for(float midVal : midValue)
+			measured = midVal;
+		if(measured > middleValue)
+		{
+			System.out.println("We have hit a line");
+			boolean turnedEnough = false;
+			Motor.A.stop(true);
+			Motor.D.stop(true);
+			gSensor.reset();
+			Motor.A.setSpeed(BasicSpeed);
+			while(!turnedEnough)
+			{
+				float thisAngle = 0;
+				float[] angle = gSensor.angle();
+				for(float x: angle)
+				{
+					thisAngle = x;
+				}
+				if(thisAngle <= -150)
+				{
+
+					turnedEnough = true;
+				}
+				else 
+				{
+					Motor.A.backward();
+				}
+			}
+			Motor.A.setSpeed(BasicSpeed);
+			Motor.D.setSpeed(BasicSpeed);
+			for(int i = 10000; i > 0; i--)
+			{
+				Motor.A.backward();
+				Motor.D.backward();
+			}
+			Motor.A.stop(true);
+			Motor.D.stop(true);
+			return true;
+		}
+		return false;
+	}
+}
