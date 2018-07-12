@@ -1,0 +1,201 @@
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+import lejos.robotics.subsumption.Behavior;
+
+public class Challenge1Code implements Behavior
+{
+	private static ColorSampleExample cse;
+	private static UltraSample uSample;
+	private static GyroSensor gSensor;
+	
+	public Challenge1Code(GyroSensor gSensor, UltraSample uSample, ColorSampleExample cse)
+	{
+		this.gSensor = gSensor;
+		this.uSample = uSample;
+		this.cse = cse;
+	}
+	
+	private boolean suppressed = false;
+	
+	public boolean takeControl()
+	{
+		return true;
+	}
+	
+	public void suppress()
+	{
+		suppressed = true;
+	}
+	
+	public void action()
+	{
+		suppressed = false;
+		Motor.A.forward();
+		Motor.D.forward();
+		while (!suppressed)
+		{
+			Thread.yield();
+		}
+		Motor.A.stop();
+		Motor.D.stop();
+	}
+	
+	
+	
+	public void autoCalibrate()
+	{
+		float sum = (float) 0.0;
+		for(int times = 0; times < 100; times++)
+		{
+			float[] midValue = cse.redSample();
+			double measured = 0.0;
+			for(float midVal : midValue)
+				measured = midVal;
+			sum += measured;
+		}
+		float whiteValue = sum/100;
+		System.out.println("White is:"  + whiteValue);
+		Button.waitForAnyPress();
+		float sum2 = (float) 0.0;
+		for(int times = 0; times < 100; times++)
+		{
+			float[] midValue = cse.redSample();
+			double measured = 0.0;
+			for(float midVal : midValue)
+				measured = midVal;
+			sum2 += measured;
+		}
+		float blackValue = sum2/100;
+		System.out.println("Black is:" + blackValue);
+		this.middleValue = ((whiteValue + blackValue)/2);
+		Button.waitForAnyPress();
+	}
+	
+	//Till now was just the auto Calibration and stuff.
+	
+	public void doYourJob()
+	{
+		driveToLine();
+		followLine(false);
+	}
+	
+	public void driveToLine()
+	{
+		Motor.A.setSpeed(BasicSpeed);
+		Motor.D.setSpeed(BasicSpeed);
+		double value = 0;
+		while(value < middleValue)
+		{
+			float[] result =cse.redSample();
+			for(float number : result)
+				value = number;
+			Motor.A.backward();
+			Motor.D.backward();
+		}
+		Motor.A.stop(true);
+		Motor.D.stop(true);
+	}
+	
+	public void goAgain()
+	{
+		Motor.A.setSpeed(300);
+		System.out.println("Going again");
+		gSensor.reset();
+		float thisAngle = 0;
+		boolean done = false;
+		while(!done)
+		{
+			float[] angle = gSensor.angle();
+			for(float x: angle)
+			{
+				thisAngle = Math.abs(x);
+				System.out.println(thisAngle);
+			}
+			if(thisAngle >= 270)
+			{
+				done = true;
+			}
+			Motor.A.backward();
+		}
+		Motor.A.stop(true);
+		System.out.println("Got here");
+		followLine(true);
+		
+	}
+	
+	///Down here is the line following.
+	private int BasicSpeed = 150;
+	private int maximumSpeed = 300;
+	private double PGain = 300;
+	private double DGain = 2000;
+	private float middleValue;
+	private float whiteValue;
+	private float blackValue;
+	
+	public void followLine(boolean HadOne)
+	{
+		gSensor.reset();
+		double formerError = 0.0;
+		double value = 2;
+		double angle = 0;
+		while(true)
+		{
+			float thisAngle = 0;
+			float[] angles = gSensor.angle();
+			for(float x: angles)
+			{
+				angle = Math.abs(x);
+			}
+			if(angle >= 360)
+			{
+				if(!HadOne)
+				{
+					Motor.A.stop(true);
+					Motor.D.stop(true);
+					goAgain();
+					break;
+				}
+				else
+				{
+					//toMaze();
+					System.out.println("Done");
+					break;
+				}
+			}
+			int speed = 0;
+			double reading = 0.0;
+			float[] result =cse.redSample();
+			for(float number : result)
+				reading = number;
+			double error = middleValue - reading;
+			if(Math.abs(whiteValue - error) < Math.abs(error - middleValue))
+			{
+				value = 30;
+			}
+			else if(Math.abs(error - blackValue) < Math.abs(middleValue - error))
+				value = 30;
+			speed = (int) (value*(PGain * error + DGain * (error - formerError)));
+			formerError = error;
+			
+			int rightSpeed = BasicSpeed + speed;
+			int leftSpeed = BasicSpeed - speed;
+			
+			//Now we need the speeds to have a value between their max and min values
+			if (leftSpeed < 0)
+				leftSpeed = 0;
+			else if(leftSpeed > maximumSpeed)
+				leftSpeed = maximumSpeed;
+			
+			if (rightSpeed < 0)
+				rightSpeed = 0;
+			else if(rightSpeed > maximumSpeed)
+				rightSpeed = maximumSpeed;
+
+			Motor.D.setSpeed(rightSpeed);
+			Motor.A.setSpeed(leftSpeed);
+			
+			Motor.D.backward();
+			Motor.A.backward();
+			value = 2;
+		}
+	}
